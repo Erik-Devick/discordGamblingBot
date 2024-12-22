@@ -238,5 +238,60 @@ async def leaderboard(ctx):
     
     await ctx.send(f"```{table}```")
 
+#blackjack
+@bot.command()
+async def blackjack(ctx, bet):
+    user = ctx.author.display_name
+    payout = bet
+    deck = ["A",2,3,4,5,6,7,8,9,"J","Q","K"]*4
+    letterToNum = {"A":11, "J":10, "Q":10, "K":10}
+    random.shuffle(deck)
+    userHand = []
+    dealerHand = []
+
+    #make sure user is registered
+    try:
+        with open("users.json") as file:
+            users = json.load(file)
+    except (json.JSONDecodeError):
+        await ctx.send("You are not registered")
+        return
+    if user not in users.keys():
+        await ctx.send("You are not registered")
+        return
+    
+    #check if user has enough money
+    if users[user] < int(bet):
+        await ctx.send("You do not have enough money")
+        return
+    
+    #update balance
+    users[user] -= int(bet)
+
+    #print hands
+    def printHand(hand):
+        handStr = ""
+        for card in hand:
+            handStr += str(card) + " "
+        return handStr
+    
+    #check for ace in hand
+    def checkForAce(hands):
+        for hand in hands:
+            if "A" in hand:
+                return True
+        return False
+
+    #deal cards
+    userHand.append(deck.pop())
+    dealerHand.append(deck.pop())
+    userHand.append(deck.pop())
+    dealerHand.append(deck.pop())
+    await ctx.send(f"Dealer hand: {dealerHand[0]}")
+    await ctx.send(f"Your hand: {printHand(userHand)}")
+    
+
+
+
 
 bot.run(os.getenv("token").strip())
