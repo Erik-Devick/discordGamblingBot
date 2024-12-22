@@ -6,6 +6,7 @@ import json
 import random
 import os
 import time
+from table2ascii import table2ascii as t2a
 
 
 
@@ -215,6 +216,27 @@ async def reset(ctx):
         await ctx.send("You took too long to respond")
         await ctx.send("Balance reset cancelled")
         return
+
+#leaderboard
+@bot.command()
+async def leaderboard(ctx):
+    try:
+        with open("users.json") as file:
+            users = json.load(file)
+    except (json.JSONDecodeError):
+        await ctx.send("No users registered")
+        return
+    
+    sorted_users = sorted(users.items())
+    body = [list(pair) for pair in sorted_users]
+    for i in range(len(body)):
+        body[i].insert(0, i+1)
+    header = ["Rank", "User", "Balance"]
+
+    table = t2a(header=["Rank","User","Balance"],
+                body=body)
+    
+    await ctx.send(f"```{table}```")
 
 
 bot.run(os.getenv("token").strip())
