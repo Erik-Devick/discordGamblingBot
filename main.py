@@ -154,7 +154,6 @@ async def highlow(ctx, bet):
                     elif cont.content.lower() == "no":
                         break
                     else:
-                        print("here")
                         continue
                 except:
                     await ctx.send("You took too long to respond")
@@ -174,8 +173,48 @@ async def highlow(ctx, bet):
     users[user] += payout
     await ctx.send(f"New balance: ${users[user]}")
 
-    
+    #save balance
+    with open("users.json", "w") as file:
+        json.dump(users, file)
 
+#reset balance
+@bot.command() 
+async def reset(ctx):
+    user = ctx.author.display_name
+
+    #make sure user is registered
+    try:
+        with open("users.json") as file:
+            users = json.load(file)
+    except (json.JSONDecodeError):
+        await ctx.send("You are not registered")
+        return
+    if user not in users.keys():
+        await ctx.send("You are not registered")
+        return
+    
+    #make sure
+    await ctx.send("Are you sure you want to reset your balance? (yes/no)")
+    def check(m):
+        return m.author == ctx.author
+    try:
+        response = await bot.wait_for("message", check=check, timeout=10)
+        if response.content not in ["yes", "no"]:
+            await ctx.send("Balance reset cancelled")
+            return
+        elif response.content.lower() != "yes":
+            await ctx.send("Balance reset cancelled")
+            return
+        else:
+            users[user] = 1000
+            with open("users.json", "w") as file:
+                json.dump(users, file)
+            await ctx.send("Balance reset")
+            await ctx.send("New balance: $1000")
+    except:
+        await ctx.send("You took too long to respond")
+        await ctx.send("Balance reset cancelled")
+        return
 
 
 bot.run(os.getenv("token").strip())
