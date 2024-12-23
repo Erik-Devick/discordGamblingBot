@@ -18,9 +18,22 @@ intents.guild_messages = True
 intents.message_content = True
 
 #make bot instance
-bot = commands.Bot(command_prefix=">",intents=intents)
+bot = commands.Bot(command_prefix=">",intents=intents,help_command=None)
 
 
+@bot.command(name="help")
+async def help(ctx):
+    header = ["Category","Command","Example","Description"]
+    welcome = "Welcome to the casino! If you haven't already, please register by typing '>register'."
+    body = [["User","help",">help","Displays this message"],
+            ["User","register",">register","Creates account for user balance"],
+            ["User","balance",">balance","Display user balance"],
+            ["User","reset",">reset","Resets balance to $1000"],
+            ["User","leaderboard",">leaderboard","Displays all users sorted by balance"],
+            ["Game","highlow",">highlow <bet>","plays the higher or lower game"],
+            ["Game","coinflip",">coinflip <bet> <side>","bet on the outcome of a coin flip"]]
+    helpTable = t2a(header=header,body=body)
+    await ctx.send(f"```{welcome}\n{helpTable}```")
 
 #register user
 @bot.command()
@@ -129,30 +142,41 @@ async def highlow(ctx, bet):
     users[user] -= int(bet)
 
     #begin game
-    await ctx.send("You will have 10 seconds to make your guess between numbers.")
+    await ctx.send("You will have 10 seconds to make your guess of higher or lower.")
+    time.sleep(1)
+    await ctx.send("Numbers are between 1 and 100.")
+    time.sleep(1)
+    await ctx.send("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     time.sleep(1)
     while isCorrect:
-        await ctx.send(f"Current number: {startNumber}. Higher or lower?")
+        await ctx.send(f"Will the next number be higher or lower than {startNumber}?")
         def check(m):
             return m.author == ctx.author
         
         try:
-            guess = await bot.wait_for("message", check=check, timeout=10)
-            newNumber = random.randint(1, 100)
-            if guess.content not in ["higher", "lower"]:
-                await ctx.send("Invalid guess. Please enter 'higher' or 'lower'")
-                continue
-            elif (newNumber > startNumber and guess.content.lower() == "higher") or (newNumber < startNumber and guess.content.lower() == "lower"):
-                await ctx.send(f"Correct! New number: {newNumber}")
+            validGuess = False
+            while not validGuess:
+                guess = await bot.wait_for("message", check=check, timeout=10)
+                if guess.content in ["higher","lower"]:
+                    validGuess = True
+                if not validGuess:
+                    await ctx.send("Invalid guess, please enter 'higher' or 'lower'.")
+            newNumber = random.randint(1,100)
+            if (newNumber > startNumber and guess.content.lower() == "higher") or (newNumber < startNumber and guess.content.lower() == "lower"):
+                await ctx.send(f"Correct! The number was {newNumber}")
                 startNumber = newNumber
                 payout = int(payout)*2
-                await ctx.send(f"Current payout: ${payout}. Continue?")
+                await ctx.send(f"Current payout: ${payout}")
+                await ctx.send(f"Continue? (yes/no)")
                 try:
-                    cont = await bot.wait_for("message", check=check, timeout=10)
-                    if cont.content not in ["yes", "no"]:
-                        await ctx.send("Invalid response. Please enter 'yes' or 'no'")
-                        continue
-                    elif cont.content.lower() == "no":
+                    validResponse = False
+                    while not validResponse:
+                        cont = await bot.wait_for("message", check=check, timeout=10)
+                        if cont.content in ["yes","no"]:
+                            validResponse = True
+                        if not validResponse:
+                            await ctx.send("Invalid response please enter 'yes' or 'no'.")
+                    if cont.content.lower() == "no":
                         break
                     else:
                         continue
@@ -237,61 +261,6 @@ async def leaderboard(ctx):
                 body=body)
     
     await ctx.send(f"```{table}```")
-
-#blackjack
-@bot.command()
-async def blackjack(ctx, bet):
-    user = ctx.author.display_name
-    payout = bet
-    deck = ["A",2,3,4,5,6,7,8,9,"J","Q","K"]*4
-    letterToNum = {"A":11, "J":10, "Q":10, "K":10}
-    random.shuffle(deck)
-    userHand = []
-    dealerHand = []
-
-    #make sure user is registered
-    try:
-        with open("users.json") as file:
-            users = json.load(file)
-    except (json.JSONDecodeError):
-        await ctx.send("You are not registered")
-        return
-    if user not in users.keys():
-        await ctx.send("You are not registered")
-        return
-    
-    #check if user has enough money
-    if users[user] < int(bet):
-        await ctx.send("You do not have enough money")
-        return
-    
-    #update balance
-    users[user] -= int(bet)
-
-    #print hands
-    def printHand(hand):
-        handStr = ""
-        for card in hand:
-            handStr += str(card) + " "
-        return handStr
-    
-    #check for ace in hand
-    def checkForAce(hands):
-        for hand in hands:
-            if "A" in hand:
-                return True
-        return False
-
-    #deal cards
-    userHand.append(deck.pop())
-    dealerHand.append(deck.pop())
-    userHand.append(deck.pop())
-    dealerHand.append(deck.pop())
-    await ctx.send(f"Dealer hand: {dealerHand[0]}")
-    await ctx.send(f"Your hand: {printHand(userHand)}")
-    
-
-
 
 
 bot.run(os.getenv("token").strip())
