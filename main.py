@@ -31,7 +31,8 @@ async def help(ctx):
             ["User","reset",">reset","Resets balance to $1000.00"],
             ["User","leaderboard",">leaderboard","Displays all users sorted by balance"],
             ["Game","highlow",">highlow <bet>","plays the higher or lower game"],
-            ["Game","coinflip",">coinflip <bet> <side>","bet on the outcome of a coin flip"]]
+            ["Game","coinflip",">coinflip <bet> <side>","bet on the outcome of a coin flip"],
+            ["Game","baccarat",">baccarat <bet> <side>","play a game of baccarat"]]
     helpTable = t2a(header=header,body=body)
     await ctx.send(f"```{welcome}\n{helpTable}```")
 
@@ -253,6 +254,148 @@ async def leaderboard(ctx):
                 body=body)
     
     await ctx.send(f"```{table}```")
+
+#baccarat
+@bot.command()
+async def baccarat(ctx, bet, side):
+    user = ctx.author.display_name
+    payout = bet
+
+    #make sure side is valid
+    if side != "banker" and side != "player":
+        await ctx.send("```Invalid side. Valid sides are 'player', 'banker'.```")
+        return
+
+    #make sure user is registered
+    try:
+        with open("users.json") as file:
+            users = json.load(file)
+    except (json.JSONDecodeError):
+        await ctx.send("```You are not registered. Please type '>register'.```")
+        return
+    if user not in users.keys():
+        await ctx.send("```You are not registered. Please type '>register'.```")
+        return
+    
+    #check if user has enough money
+    if float(users[user]) < float(bet):
+        await ctx.send("```You do not have enough money```")
+        return
+    
+    #update balance
+    users[user] = float(users[user])-float(bet)
+    users[user] = format(users[user],".2f")
+
+    def calcHand(hand):
+        numHand = []
+        for card in hand:
+            if card in ['A','J','Q','K']:
+                numHand.append(faceToNum[card])
+            else:
+                numHand.append(card)
+        return sum(numHand)%10
+    
+    def handToString(hand):
+        output = ""
+        for card in hand:
+            output += f"{str(card)}, "
+        output = output[:-2]
+        return output
+
+    #begin game
+    deck = ['A',1,2,3,4,5,6,7,8,9,10,'J','Q','K']*4
+    random.shuffle(deck)
+    faceToNum = {'A':1,'J':10,'Q':10,'K':10}
+    playerHand = []
+    bankerHand = []
+
+    #initial deal
+    playerHand.append(deck.pop())
+    bankerHand.append(deck.pop())
+    playerHand.append(deck.pop())
+    bankerHand.append(deck.pop())
+
+    await ctx.send(f"```Initial deal:\nPlayer hand: {handToString(playerHand)} = {calcHand(playerHand)}\nBanker hand: {handToString(bankerHand)} = {calcHand(bankerHand)}```")
+
+    #check for natural win
+    natural = False
+    if (calcHand(playerHand) == 8 or calcHand(playerHand) == 9) and (calcHand(bankerHand) == 8 or calcHand(bankerHand)== 9):
+        await ctx.send("```Natural tie!```")
+        natural = True
+        winner = "tie"
+    elif (calcHand(playerHand) == 8 or calcHand(playerHand) == 9) and (calcHand(bankerHand)!=8 and calcHand(bankerHand)!=9):
+        await ctx.send("```Natural win for player!```")
+        natural = True
+        winner = "player"
+    elif (calcHand(bankerHand) == 8 or calcHand(bankerHand) == 9) and (calcHand(playerHand)!=8 and calcHand(playerHand)!=9):
+        await ctx.send("```Natural win for banker!```")
+        natural = True
+        winner = "banker"
+
+    if not natural:
+        time.sleep(1)
+        #check for player third card
+        if calcHand(playerHand) <= 5:
+            playerHand.append(deck.pop())
+            await ctx.send(f"```Player dealt third card:\nPlayer hand: {handToString(playerHand)} = {calcHand(playerHand)}```")
+        else:
+            await ctx.send("```Players stays```")
+
+        time.sleep(1)
+        #check for banker third card
+        playerScore = calcHand(playerHand)
+        bankerScore = calcHand(bankerHand)
+        if playerScore == 8 and bankerScore <= 2:
+            bankerHand.append(deck.pop())
+            await ctx.send(f"```Banker dealt third card:\nBanker hand: {handToString(bankerHand)} = {calcHand(bankerHand)}```")
+        elif (playerScore == 6 or playerScore == 7) and bankerScore <= 6:
+            bankerHand.append(deck.pop())
+            await ctx.send(f"```Banker dealt third card:\nBanker hand: {handToString(bankerHand)} = {calcHand(bankerHand)}```")
+        elif (playerScore == 4 or playerScore == 5) and bankerScore <= 5:
+            bankerHand.append(deck.pop())
+            await ctx.send(f"```Banker dealt third card:\nBanker hand: {handToString(bankerHand)} = {calcHand(bankerHand)}```")
+        elif (playerScore == 2 or playerScore == 3) and bankerScore <= 4:
+            bankerHand.append(deck.pop())
+            await ctx.send(f"```Banker dealt third card:\nBanker hand: {handToString(bankerHand)} = {calcHand(bankerHand)}```")
+        elif (playerScore == 0 or playerScore == 1 or playerScore == 9) and bankerScore <= 3:
+            bankerHand.append(deck.pop())
+            await ctx.send(f"```Banker dealt third card:\nBanker hand: {handToString(bankerHand)} = {calcHand(bankerHand)}```")
+        else:
+            await ctx.send("```Banker stays```")
+
+        time.sleep(1)
+        await ctx.send(f"```Final hands:\nPlayer hand: {handToString(playerHand)} = {calcHand(playerHand)}\nBanker hand: {handToString(bankerHand)} = {calcHand(bankerHand)}```")
+
+        #decide winner
+        bankerScore = calcHand(bankerHand)
+        playerScore = calcHand(playerHand)
+        if bankerScore == playerScore:
+            winner = "tie"
+        elif bankerScore > playerScore:
+            winner = "banker"
+        elif bankerScore < playerScore:
+            winner = "player"
+    
+    await ctx.send(f"```WINNER: {winner}!```")
+
+    #determine payment
+    if winner == "tie":
+        payout = float(bet)*1.5
+    elif side == winner:
+        payout = float(bet)*2
+    else:
+        payout = 0
+
+    #update balance
+    users[user] = float(users[user])+float(payout)
+    users[user] = format(users[user],".2f")
+    await ctx.send(f"```New balance: ${users[user]}```")
+
+    #save balance
+    with open("users.json", "w") as file:
+        json.dump(users, file)
+    
+    
 
 
 bot.run(os.getenv("token").strip())
